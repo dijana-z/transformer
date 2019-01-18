@@ -158,15 +158,18 @@ def create_datasets(flags):
 
     Returns
     -------
-        train_dataset, test_dataset: Iterators for train and test datasets.
+        train_dataset, val_dataset, test_dataset: Train, val, and test datasets.
     """
     # Load data
     x_train, y_train, *_ = load_data(flags.train_inputs, flags.train_labels, flags.en_vocab_path,
                                      flags.de_vocab_path, create_train_sentences)
+    x_val, y_val, *_ = load_data(flags.val_inputs, flags.val_labels, flags.en_vocab_path,
+                                 flags.de_vocab_path, create_train_sentences)
     x_test, y_test, *_ = load_data(flags.test_inputs, flags.test_labels, flags.en_vocab_path,
                                    flags.de_vocab_path, create_test_sentences)
 
     train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+    val_dataset = tf.data.Dataset.from_tensor_slices((x_val, y_val))
     test_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test))
 
-    return train_dataset, test_dataset
+    return train_dataset, val_dataset, test_dataset
