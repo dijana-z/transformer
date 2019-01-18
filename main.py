@@ -43,11 +43,11 @@ def main():
     # Make vocabularies
     preprocessing.make_vocabulary(flags.train_inputs, flags.en_vocab_path)
     preprocessing.make_vocabulary(flags.train_labels, flags.de_vocab_path)
-    train_dataset, val_dataset, test_dataset = preprocessing.create_datasets(flags)
+    (x_train, y_train), (x_val, y_val), _ = preprocessing.create_datasets(flags)
 
     # Create model
     model = Transformer(flags)
-    model.fit(train_dataset, val_dataset)
+    model.fit(x_train, y_train, x_val, y_val)
 
 
 if __name__ == '__main__':

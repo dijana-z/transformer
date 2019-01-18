@@ -168,8 +168,4 @@ def create_datasets(flags):
     x_test, y_test, *_ = load_data(flags.test_inputs, flags.test_labels, flags.en_vocab_path,
                                    flags.de_vocab_path, create_test_sentences)
 
-    train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
-    val_dataset = tf.data.Dataset.from_tensor_slices((x_val, y_val))
-    test_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test))
-
-    return train_dataset, val_dataset, test_dataset
+    return (x_train, y_train), (x_val, y_val), (x_test, y_test)

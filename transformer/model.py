@@ -56,7 +56,7 @@ class Transformer:
 
         return loss
 
-    def fit(self, train_dataset, val_dataset):
+    def fit(self, x_train, y_train, x_val, y_val):
         """Fit model on passed data.
 
         Parameters
@@ -66,7 +66,11 @@ class Transformer:
         val_dataset: tf.data.Dataset
             Dataset with validation data.
         """
-        # Prepare datasets for training and validation.
+        # Create train and validation datasets
+        train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+        val_dataset = tf.data.Dataset.from_tensor_slices((x_val, y_val))
+
+        # Prepare datasets for training and validation
         train_dataset = train_dataset.repeat(self._flags.num_epochs).batch(self._flags.batch_size)
         train_dataset = train_dataset.prefetch(buffer_size=10 * self._flags.batch_size)
         train_dataset = train_dataset.shuffle(buffer_size=10 * self._flags.batch_size)
@@ -101,6 +105,7 @@ class Transformer:
                                                save_summaries_steps=10) as sess:
             batches = 0
             while not sess.should_stop():
+                print('sisaj mi kurac')
                 sess.run([optimizer, train_loss])
                 batches += 1
                 if batches % 1000 == 0:
