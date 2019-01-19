@@ -41,8 +41,8 @@ def embedding(inputs, vocab_size, num_units, scope="embedding", reuse=None):
     -------
         Output tensor.
     """
-    return tf.contrib.layers.embed_sequence(inputs, vocab_size=vocab_size, embed_dim=num_units, scope=scope,
-                                            reuse=reuse)
+    return tf.contrib.layers.embed_sequence(inputs, vocab_size=vocab_size, embed_dim=num_units,
+                                            scope=scope, reuse=reuse)
 
 
 def positional_encoding(inputs, num_units, scope="positional_encoding", reuse=None):
@@ -82,8 +82,8 @@ def positional_encoding(inputs, num_units, scope="positional_encoding", reuse=No
         return outputs
 
 
-def multihead_attention(queries, keys, num_units=None, num_heads=8, dropout_rate=0, is_training=True, causality=False,
-                        scope="multihead_attention", reuse=None):
+def multihead_attention(queries, keys, num_units=None, num_heads=8, dropout_rate=0, is_training=True,
+                        causality=False, scope="multihead_attention", reuse=None):
     """Applies multihead attention.
 
     Parameters
@@ -114,7 +114,7 @@ def multihead_attention(queries, keys, num_units=None, num_heads=8, dropout_rate
     with tf.variable_scope(scope, reuse=reuse):
         # Set the fall back option for num_units
         if num_units is None:
-            num_units = tf.shape(queries).as_list()[-1]
+            num_units = tf.shape(queries)[-1]
 
         # Linear projections
         query = tf.layers.Dense(num_units, activation=tf.nn.relu)(queries)  # (N, T_q, C)
@@ -130,12 +130,13 @@ def multihead_attention(queries, keys, num_units=None, num_heads=8, dropout_rate
         outputs = tf.matmul(query, tf.transpose(key, [0, 2, 1]))  # (h*N, T_q, T_k)
 
         # Scale
-        outputs = outputs / (tf.shape(key).as_list()[-1] ** 0.5)
+        outputs = outputs / (tf.shape(key)[-1] ** 0.5)
 
         # Key Masking
         key_masks = tf.sign(tf.reduce_sum(tf.abs(keys), axis=-1))  # (N, T_k)
         key_masks = tf.tile(key_masks, [num_heads, 1])  # (h*N, T_k)
-        key_masks = tf.tile(tf.expand_dims(key_masks, 1), [1, tf.shape(queries)[1], 1])  # (h*N, T_q, T_k)
+        key_masks = tf.tile(tf.expand_dims(key_masks, 1),
+                            [1, tf.shape(queries)[1], 1])  # (h*N, T_q, T_k)
 
         paddings = tf.ones_like(outputs) * (-2 ** 32 + 1)
         outputs = tf.where(tf.equal(key_masks, 0), paddings, outputs)  # (h*N, T_q, T_k)
@@ -155,11 +156,13 @@ def multihead_attention(queries, keys, num_units=None, num_heads=8, dropout_rate
         # Query Masking
         query_masks = tf.sign(tf.reduce_sum(tf.abs(queries), axis=-1))  # (N, T_q)
         query_masks = tf.tile(query_masks, [num_heads, 1])  # (h*N, T_q)
-        query_masks = tf.tile(tf.expand_dims(query_masks, -1), [1, 1, tf.shape(keys)[1]])  # (h*N, T_q, T_k)
+        query_masks = tf.tile(tf.expand_dims(query_masks, -1),
+                              [1, 1, tf.shape(keys)[1]])  # (h*N, T_q, T_k)
         outputs *= query_masks  # broadcasting. (N, T_q, C)
 
         # Dropouts
-        outputs = tf.layers.dropout(outputs, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
+        outputs = tf.layers.dropout(outputs, rate=dropout_rate,
+                                    training=tf.convert_to_tensor(is_training))
 
         # Weighted sum
         outputs = tf.matmul(outputs, value)  # ( h*N, T_q, C/h)
