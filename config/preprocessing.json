@@ -1,8 +1,0 @@
-[
-	{
-		"english_vocabulary_input": "../corpora/train.tags.de-en.en",
-		"german_vocabulary_input": "../corpora/train.tags.de-en.de",
-		"english_vocabulary_outfile": "english_vocab.csv",
-		"german_vocabulary_outfile": "german_vocab.csv"
-	}
-]
