@@ -21,30 +21,6 @@ def normalize(inputs, scope="ln", reuse=None):
     return tf.contrib.layers.layer_norm(inputs, reuse=reuse, scope=scope)
 
 
-def embedding(inputs, vocab_size, num_units, scope="embedding", reuse=None):
-    """Embeds given tensor.
-
-    Parameters
-    ----------
-    inputs:
-        Input tensor.
-    vocab_size:
-        Size of the vocabulary.
-    num_units:
-        Number of embedding hidden units.
-    scope:
-        Variable scope.
-    reuse:
-        Indicator whether to reuse weights.
-
-    Returns
-    -------
-        Output tensor.
-    """
-    return tf.contrib.layers.embed_sequence(inputs, vocab_size=vocab_size, embed_dim=num_units,
-                                            scope=scope, reuse=reuse)
-
-
 def positional_encoding(inputs, num_units, scope="positional_encoding", reuse=None):
     """Sinusoidal positional encoding.
 
@@ -64,6 +40,7 @@ def positional_encoding(inputs, num_units, scope="positional_encoding", reuse=No
         Output tensor.
     """
     batch_size, sequence_len = 32, 15
+    # batch_size, sequence_len = inputs.get_shape().as_list()
 
     with tf.variable_scope(scope, reuse=reuse):
         position_ind = tf.tile(tf.expand_dims(tf.range(sequence_len), 0), [batch_size, 1])
