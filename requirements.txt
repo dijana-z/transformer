@@ -1,0 +1,6 @@
+tensorflow-gpu
+numpy
+keras
+regex
+tensorboard==1.10.0
+wheel
