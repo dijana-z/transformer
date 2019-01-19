@@ -22,7 +22,7 @@ def positional_encoding(inputs, batch_size, num_units, scope="positional_encodin
     -------
         Output tensor.
     """
-    sequence_len = inputs.get_shape.as_list()[1]
+    sequence_len = inputs.get_shape().as_list()[1]
 
     with tf.variable_scope(scope, reuse=reuse):
         position_ind = tf.tile(tf.expand_dims(tf.range(sequence_len), 0), [batch_size, 1])

@@ -37,6 +37,12 @@ def main():
     argparser.add_argument('--mhdpa_blocks', type=int, default=6, choices=range(1, 10),
                            help='Number of MHDPA blocks to use in encoder.')
     argparser.add_argument('--dropout_rate', type=float, default=0.1, help='Dropout rate.')
+    argparser.add_argument('--sequence_length', type=int, default=15,
+                           help='Length of input/output sequences.')
+
+    # Running parameters
+    argparser.add_argument('--mode', type=str, choices=['train', 'test', 'predict'], default='train',
+                           help='Which mode to run script in.')
 
     # Parse arguments
     flags = argparser.parse_args()
@@ -44,11 +50,20 @@ def main():
     # Make vocabularies
     en_vocab_size = preprocessing.make_vocabulary(flags.train_inputs, flags.en_vocab_path)
     de_vocab_size = preprocessing.make_vocabulary(flags.train_labels, flags.de_vocab_path)
-    (x_train, y_train), (x_val, y_val), _ = preprocessing.create_datasets(flags)
+    (x_train, y_train), (x_val, y_val), (x_test, y_test) = preprocessing.create_datasets(flags)
 
     # Create model
     model = Transformer(flags, en_vocab_size, de_vocab_size)
-    model.fit(x_train, y_train, x_val, y_val)
+
+    if flags.mode == 'train':
+        model.fit(x_train, y_train, x_val, y_val)
+    elif flags.mode == 'test':
+        loss, acc = model.eval(x_test, y_test)
+        print(f'[loss: {loss}; acc: {acc}]')
+    elif flags.mode == 'predict':
+        sentence = input('Source sentence: ')
+        output_sentence = model.predict(sentence)
+        print(f'Output sentence: {output_sentence}')
 
 
 if __name__ == '__main__':

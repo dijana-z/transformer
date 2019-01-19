@@ -1,9 +1,11 @@
+from functools import reduce
+
+import numpy as np
 import tensorflow as tf
 
-from transformer import modules
+from transformer import modules, preprocessing
 
 
-# noinspection PyMethodMayBeStatic
 class Transformer:
     """Variant of the Transformer model from Attention Is All You Need."""
 
@@ -17,6 +19,10 @@ class Transformer:
         self._flags = flags
         self._en_vocab_size = en_vocab_size
         self._de_vocab_size = de_vocab_size
+
+        # Create session config
+        gpu_options = tf.GPUOptions(allow_growth=True)
+        self._tf_config = tf.ConfigProto(allow_soft_placement=True, gpu_options=gpu_options)
 
     def _build_model(self, inputs, labels, dropout):
         """Build model.
@@ -81,7 +87,7 @@ class Transformer:
                 key_masks = tf.expand_dims(tf.sign(tf.reduce_sum(tf.abs(embedded), axis=-1)), -1)
 
                 # Perform positional encoding
-                decoded = modules.positional_encoding(decoder_inputs,
+                decoded = modules.positional_encoding(inputs,
                                                       batch_size=self._flags.batch_size,
                                                       num_units=self._flags.mlp_units,
                                                       reuse=tf.AUTO_REUSE)
@@ -138,7 +144,8 @@ class Transformer:
         with tf.name_scope('acc'):
             predictions = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
             is_target = tf.cast(tf.not_equal(labels, 0), tf.float32)
-            acc = tf.reduce_sum(tf.to_float(tf.equal(predictions, labels)) * is_target) / tf.reduce_sum(is_target)
+            acc = tf.reduce_sum(tf.to_float(tf.equal(predictions,
+                                                     labels)) * is_target) / tf.reduce_sum(is_target)
 
         with tf.name_scope('loss'):
             y_smoothed = modules.label_smoothing(tf.one_hot(labels, depth=self._de_vocab_size))
@@ -146,7 +153,7 @@ class Transformer:
             loss = tf.reduce_sum(loss * tf.cast(is_target, tf.float64)) / tf.cast(
                 tf.reduce_sum(is_target), tf.float64)
 
-        return loss, acc
+        return loss, acc, logits
 
     def fit(self, x_train, y_train, x_val, y_val):
         """Fit model on passed data.
@@ -180,8 +187,8 @@ class Transformer:
         val_inputs, val_labels = val_it.get_next()
 
         # Create network ops
-        train_loss, train_acc = self._build(train_inputs, train_labels, dropout=True)
-        val_loss, val_acc = self._build(val_inputs, val_labels, dropout=False)
+        train_loss, train_acc, _ = self._build(train_inputs, train_labels, dropout=True)
+        val_loss, val_acc, _ = self._build(val_inputs, val_labels, dropout=False)
 
         # Create summaries
         tf.summary.scalar('loss/train', train_loss)
@@ -196,13 +203,9 @@ class Transformer:
                 train_loss,
                 global_step=g_step)
 
-        # Create session config
-        gpu_options = tf.GPUOptions(allow_growth=True)
-        tf_config = tf.ConfigProto(allow_soft_placement=True, gpu_options=gpu_options)
-
         # Create training session
         with tf.train.MonitoredTrainingSession(checkpoint_dir=self._flags.logdir,
-                                               config=tf_config,
+                                               config=self._tf_config,
                                                save_summaries_steps=10) as sess:
             batches = 0
             while not sess.should_stop():
@@ -212,31 +215,83 @@ class Transformer:
                     for _ in range(50):
                         sess.run([val_loss, val_acc])
 
-    def eval(self, test_dataset):
+    def eval(self, x_test, y_test):
         """Evaluate model on test data.
 
         Parameters
         ----------
-        test_dataset: tf.data.Dataset
-            Dataset with test data.
+        x_test:
+            Test inputs.
+        y_test:
+            Test labels.
 
         Returns
         -------
             loss, acc: Loss and accuracy of model on test data.
         """
         # Create dataset
-        test_dataset = test_dataset.batch(int(1e10))
+        test_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test))
+        test_dataset = test_dataset.batch(32, drop_remainder=True)
         dataset_it = test_dataset.make_one_shot_iterator()
         inputs, labels = dataset_it.get_next()
 
         # Create ops
-        test_loss = self._build(inputs, labels, dropout=False)
+        test_loss, test_acc, _ = self._build(inputs, labels, dropout=False)
 
-        # Create session
-        with tf.train.SingularMonitoredSession(checkpoint_dir=self._flags.logdir) as sess:
-            loss = sess.run([test_loss])
+        # Create session and load model weights.
+        with tf.train.SingularMonitoredSession(checkpoint_dir=self._flags.logdir,
+                                               config=self._tf_config) as sess:
+            loss, acc, batches = 0, 0, 0
+            while not sess.should_stop():
+                b_loss, b_acc = sess.run([test_loss, test_acc])
+                loss += b_loss
+                acc += b_acc
+                batches += 1
 
-        return loss
+        return loss / batches, acc / batches
 
     def predict(self, inputs):
-        pass
+        """Perform inference on input sentence.
+
+        Parameters
+        ----------
+        inputs:
+            Input sentence.
+
+        Returns
+        -------
+            output: Generated translation.
+        """
+        # Load vocabularies
+        en_idx, _ = preprocessing.load_vocabulary(self._flags.en_vocab_path)
+        _, idx_de = preprocessing.load_vocabulary(self._flags.de_vocab_path)
+
+        # Create sentence from input sequence
+        line = preprocessing.refine(inputs).split()
+        input_template = np.zeros((1, 15))
+        input_sequence = np.array([en_idx[word] for word in line])
+        input_template[:, :len(input_sequence)] = np.expand_dims(input_sequence, axis=0)
+        input_sequence = input_template
+
+        # Create placeholders
+        x = tf.placeholder(dtype=tf.int32, shape=[None, self._flags.sequence_length])
+        y = tf.placeholder(dtype=tf.int32, shape=[None, self._flags.sequence_length])
+
+        # Create network
+        _, _, logits = self._build(x, y, dropout=False)
+        predictions = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
+
+        # Create session and load model weights.
+        with tf.train.SingularMonitoredSession(checkpoint_dir=self._flags.logdir,
+                                               config=self._tf_config) as sess:
+            # Initialize outputs
+            output_sequence = np.zeros([1, self._flags.sequence_length], dtype=np.int32)
+
+            # Perform autoregressive inference
+            for i in range(self._flags.sequence_length):
+                autoreg = sess.run(predictions, feed_dict={x: input_sequence, y: output_sequence})
+                output_sequence[:, i] = autoreg[0, i]
+
+            # TODO: Reconstruct sentence from predictions
+
+        return output_sequence

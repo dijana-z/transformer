@@ -141,14 +141,14 @@ def create_train_sentences(infile):
             line and not line.startswith('<')]
 
 
+def refine(line):
+    line = regex.sub('<[^>]+>', '', line)
+    line = regex.sub('[^\s\p{Latin}\']', '', line)
+    return line.strip()
+
+
 def create_test_sentences(infile):
     """Create sentences from data in passed file."""
-
-    def refine(line):
-        line = regex.sub('<[^>]+>', '', line)
-        line = regex.sub('[^\s\p{Latin}\']', '', line)
-        return line.strip()
-
     return [refine(line) for line in codecs.open(infile, 'r', 'utf-8').read().split('\n') if
             line and line.startswith('<seg')]
 

@@ -4,3 +4,4 @@ keras
 regex
 tensorboard==1.10.0
 wheel
+nltk
