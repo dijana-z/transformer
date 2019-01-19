@@ -4,7 +4,6 @@ import os
 from collections import Counter
 
 import regex
-import tensorflow as tf
 from keras.preprocessing.sequence import pad_sequences
 
 
