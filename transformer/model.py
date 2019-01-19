@@ -46,7 +46,9 @@ class Transformer:
                 key_masks = tf.expand_dims(tf.sign(tf.reduce_sum(tf.abs(embedded), axis=-1)), axis=-1)
 
                 # Perform positional encoding
-                encoded = modules.positional_encoding(inputs, num_units=self._flags.mlp_units,
+                encoded = modules.positional_encoding(inputs,
+                                                      batch_size=self._flags.batch_size,
+                                                      num_units=self._flags.mlp_units,
                                                       reuse=tf.AUTO_REUSE)
                 encoded += tf.cast(embedded, tf.float64)
                 encoded *= tf.cast(key_masks, tf.float64)
@@ -79,7 +81,9 @@ class Transformer:
                 key_masks = tf.expand_dims(tf.sign(tf.reduce_sum(tf.abs(embedded), axis=-1)), -1)
 
                 # Perform positional encoding
-                decoded = modules.positional_encoding(decoder_inputs, num_units=self._flags.mlp_units,
+                decoded = modules.positional_encoding(decoder_inputs,
+                                                      batch_size=self._flags.batch_size,
+                                                      num_units=self._flags.mlp_units,
                                                       reuse=tf.AUTO_REUSE)
                 decoded += tf.cast(embedded, tf.float64)
                 decoded *= tf.cast(key_masks, tf.float64)
@@ -132,10 +136,9 @@ class Transformer:
         logits = self._build_model(inputs, labels, dropout)
 
         with tf.name_scope('acc'):
-            predictions = tf.to_int32(tf.arg_max(logits, dimension=-1))
-            is_target = tf.to_float(tf.not_equal(labels, 0))
-            acc = tf.reduce_sum(tf.to_float(tf.equal(predictions, labels)) * is_target) / tf.reduce_sum(
-                is_target)
+            predictions = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
+            is_target = tf.cast(tf.not_equal(labels, 0), tf.float32)
+            acc = tf.reduce_sum(tf.to_float(tf.equal(predictions, labels)) * is_target) / tf.reduce_sum(is_target)
 
         with tf.name_scope('loss'):
             y_smoothed = modules.label_smoothing(tf.one_hot(labels, depth=self._de_vocab_size))
@@ -167,7 +170,7 @@ class Transformer:
         train_dataset = train_dataset.repeat(self._flags.num_epochs).batch(self._flags.batch_size)
         train_dataset = train_dataset.prefetch(buffer_size=10 * self._flags.batch_size)
         train_dataset = train_dataset.shuffle(buffer_size=10 * self._flags.batch_size)
-        val_dataset = val_dataset.repeat().batch(1000)
+        val_dataset = val_dataset.repeat().batch(32)
 
         # Create iterators and inputs
         train_it = train_dataset.make_one_shot_iterator()
@@ -206,7 +209,8 @@ class Transformer:
                 sess.run([optimizer, train_loss, train_acc])
                 batches += 1
                 if batches % 1000 == 0:
-                    sess.run([val_loss, val_acc])
+                    for _ in range(50):
+                        sess.run([val_loss, val_acc])
 
     def eval(self, test_dataset):
         """Evaluate model on test data.

@@ -2,56 +2,15 @@ import numpy as np
 import tensorflow as tf
 
 
-def normalize(inputs, scope="ln", reuse=None):
-    """Normalizes network layers.
-
-    Parameters
-    ----------
-    inputs:
-        Input tensors.
-    scope:
-        Variable scope.
-    reuse:
-        Indicator whether to reuse weights.
-
-    Returns
-    -------
-        Normalized tensor.
-    """
-    return tf.contrib.layers.layer_norm(inputs, reuse=reuse, scope=scope)
-
-
-def embedding(inputs, vocab_size, num_units, scope="embedding", reuse=None):
-    """Embeds given tensor.
-
-    Parameters
-    ----------
-    inputs:
-        Input tensor.
-    vocab_size:
-        Size of the vocabulary.
-    num_units:
-        Number of embedding hidden units.
-    scope:
-        Variable scope.
-    reuse:
-        Indicator whether to reuse weights.
-
-    Returns
-    -------
-        Output tensor.
-    """
-    return tf.contrib.layers.embed_sequence(inputs, vocab_size=vocab_size, embed_dim=num_units,
-                                            scope=scope, reuse=reuse)
-
-
-def positional_encoding(inputs, num_units, scope="positional_encoding", reuse=None):
+def positional_encoding(inputs, batch_size, num_units, scope="positional_encoding", reuse=None):
     """Sinusoidal positional encoding.
 
     Parameters
     ----------
     inputs:
         Input tensors.
+    batch_size:
+        Size of each batch.
     num_units:
         Output dimensions.
     scope:
@@ -63,7 +22,7 @@ def positional_encoding(inputs, num_units, scope="positional_encoding", reuse=No
     -------
         Output tensor.
     """
-    batch_size, sequence_len = 32, 15
+    sequence_len = inputs.get_shape.as_list()[1]
 
     with tf.variable_scope(scope, reuse=reuse):
         position_ind = tf.tile(tf.expand_dims(tf.range(sequence_len), 0), [batch_size, 1])
@@ -135,8 +94,7 @@ def multihead_attention(queries, keys, num_units=None, num_heads=8, dropout_rate
         # Key Masking
         key_masks = tf.sign(tf.reduce_sum(tf.abs(keys), axis=-1))  # (N, T_k)
         key_masks = tf.tile(key_masks, [num_heads, 1])  # (h*N, T_k)
-        key_masks = tf.tile(tf.expand_dims(key_masks, 1),
-                            [1, tf.shape(queries)[1], 1])  # (h*N, T_q, T_k)
+        key_masks = tf.tile(tf.expand_dims(key_masks, 1), [1, tf.shape(queries)[1], 1])  # (h*N, T_q, T_k)
 
         paddings = tf.ones_like(outputs) * (-2 ** 32 + 1)
         outputs = tf.where(tf.equal(key_masks, 0), paddings, outputs)  # (h*N, T_q, T_k)
@@ -156,13 +114,11 @@ def multihead_attention(queries, keys, num_units=None, num_heads=8, dropout_rate
         # Query Masking
         query_masks = tf.sign(tf.reduce_sum(tf.abs(queries), axis=-1))  # (N, T_q)
         query_masks = tf.tile(query_masks, [num_heads, 1])  # (h*N, T_q)
-        query_masks = tf.tile(tf.expand_dims(query_masks, -1),
-                              [1, 1, keys.get_shape().as_list()[1]])  # (h*N, T_q, T_k)
+        query_masks = tf.tile(tf.expand_dims(query_masks, -1), [1, 1, keys.get_shape().as_list()[1]])  # (h*N, T_q, T_k)
         outputs *= query_masks  # broadcasting. (N, T_q, C)
 
         # Dropouts
-        outputs = tf.layers.dropout(outputs, rate=dropout_rate,
-                                    training=tf.convert_to_tensor(is_training))
+        outputs = tf.layers.dropout(outputs, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
 
         # Weighted sum
         outputs = tf.matmul(outputs, value)  # ( h*N, T_q, C/h)
@@ -174,7 +130,7 @@ def multihead_attention(queries, keys, num_units=None, num_heads=8, dropout_rate
         outputs += queries
 
         # Normalize
-        outputs = normalize(outputs)  # (N, T_q, C)
+        outputs = tf.contrib.layers.layer_norm(outputs, reuse=reuse, scope='ln')  # (N, T_q, C)
 
     return outputs
 
@@ -201,7 +157,7 @@ def feedforward(inputs, num_units=[2048, 512], scope="multihead_attention", reus
     with tf.variable_scope(scope, reuse=reuse):
         outputs = tf.layers.Conv1D(filters=num_units[0], kernel_size=1, activation=tf.nn.relu)(inputs)
         outputs = tf.layers.Conv1D(filters=num_units[1], kernel_size=1)(outputs)
-        outputs = normalize(outputs + inputs)
+        tf.contrib.layers.layer_norm(outputs + inputs, reuse=reuse, scope='ln')
 
     return outputs
 

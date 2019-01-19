@@ -11,15 +11,15 @@ def main():
     # File flags
     argparser.add_argument('--train_inputs', type=str, default='./data/train.tags.de-en.en',
                            help='Path to training data inputs.')
-    argparser.add_argument('--train_labels', type=str, default='./data/train.tags.de-en.en',
+    argparser.add_argument('--train_labels', type=str, default='./data/train.tags.de-en.de',
                            help='Path to training data labels.')
     argparser.add_argument('--val_inputs', type=str, default='./data/IWSLT16.TED.tst2012.de-en.en.xml',
                            help='Path to val data inputs.')
-    argparser.add_argument('--val_labels', type=str, default='./data/IWSLT16.TED.tst2012.de-en.en.xml',
+    argparser.add_argument('--val_labels', type=str, default='./data/IWSLT16.TED.tst2012.de-en.de.xml',
                            help='Path to val data labels.')
     argparser.add_argument('--test_inputs', type=str, default='./data/IWSLT16.TED.tst2014.de-en.en.xml',
                            help='Path to test data inputs.')
-    argparser.add_argument('--test_labels', type=str, default='./data/IWSLT16.TED.tst2014.de-en.en.xml',
+    argparser.add_argument('--test_labels', type=str, default='./data/IWSLT16.TED.tst2014.de-en.de.xml',
                            help='Path to test data labels.')
     argparser.add_argument('--en_vocab_path', type=str, default='./data/en-vocab.csv',
                            help='Path to English vocabulary file.')

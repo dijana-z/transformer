@@ -21,7 +21,11 @@ Outputs from the decoder pass through a linear layer with a softmax activation t
 
 ![Model](https://camo.githubusercontent.com/88e8f36ce61dedfd2491885b8df2f68c4d1f92f5/687474703a2f2f696d6775722e636f6d2f316b72463252362e706e67)
 ## :computer: Running the code:
-**TODO**: Write section.
+Get the dataset by running:
+```
+wget -qO- --show-progress https://wit3.fbk.eu/archive/2016-01//texts/de/en/de-en.tgz | tar xz; mv de-en data
+```
+Hyperparameters are set via flags passed to the ```main.py``` script in the project root. There are reasonable defaults set so you can just run ```python main.py``` to start training, note that training times can get quite long even on a very powerful PC (>24h).
 
 ## :mortar_board: Authors:
 * Dijana Zulfikaric | dijanaz1996@gmail.com | GitHub &bull; [dijana-z](https://github.com/dijana-z) | LinkedIn &bull; [in/dijana-zulfikaric](https://www.linkedin.com/in/dijana-zulfikaric/)
