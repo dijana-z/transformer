@@ -61,10 +61,14 @@ class Transformer:
 
         Parameters
         ----------
-        train_dataset: tf.data.Dataset
-            Dataset with training data.
-        val_dataset: tf.data.Dataset
-            Dataset with validation data.
+        x_train:
+            Train inputs.
+        y_train:
+            Train labels.
+        x_val:
+            Validation inputs.
+        y_val:
+            Validation labels.
         """
         # Create train and validation datasets
         train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
@@ -100,12 +104,16 @@ class Transformer:
                 train_loss,
                 global_step=g_step)
 
+        # Create session config
+        gpu_options = tf.GPUOptions(allow_growth=True)
+        tf_config = tf.ConfigProto(allow_soft_placement=True, gpu_options=gpu_options)
+
         # Create training session
         with tf.train.MonitoredTrainingSession(checkpoint_dir=self._flags.logdir,
+                                               config=tf_config,
                                                save_summaries_steps=10) as sess:
             batches = 0
             while not sess.should_stop():
-                print('sisaj mi kurac')
                 sess.run([optimizer, train_loss])
                 batches += 1
                 if batches % 1000 == 0:

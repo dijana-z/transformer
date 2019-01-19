@@ -147,7 +147,7 @@ def create_test_sentences(infile):
         return line.strip()
 
     return [refine(line) for line in codecs.open(infile, 'r', 'utf-8').read().split('\n') if
-            line and not line.startswith('<seg')]
+            line and line.startswith('<seg')]
 
 
 def create_datasets(flags):
@@ -164,7 +164,7 @@ def create_datasets(flags):
     x_train, y_train, *_ = load_data(flags.train_inputs, flags.train_labels, flags.en_vocab_path,
                                      flags.de_vocab_path, create_train_sentences)
     x_val, y_val, *_ = load_data(flags.val_inputs, flags.val_labels, flags.en_vocab_path,
-                                 flags.de_vocab_path, create_train_sentences)
+                                 flags.de_vocab_path, create_test_sentences)
     x_test, y_test, *_ = load_data(flags.test_inputs, flags.test_labels, flags.en_vocab_path,
                                    flags.de_vocab_path, create_test_sentences)
 
