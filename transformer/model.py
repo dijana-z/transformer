@@ -42,14 +42,15 @@ class Transformer:
                 embedded = tf.contrib.layers.embed_sequence(inputs,
                                                             vocab_size=self._en_vocab_size,
                                                             embed_dim=self._flags.mlp_units,
+                                                            scope='Encoder',
                                                             reuse=tf.AUTO_REUSE)
                 key_masks = tf.expand_dims(tf.sign(tf.reduce_sum(tf.abs(embedded), axis=-1)), axis=-1)
 
                 # Perform positional encoding
                 encoded = modules.positional_encoding(inputs, num_units=self._flags.mlp_units,
                                                       reuse=tf.AUTO_REUSE)
-                encoded += embedded
-                encoded *= key_masks
+                encoded += tf.cast(embedded, tf.float64)
+                encoded *= tf.cast(key_masks, tf.float64)
 
                 # Perform Dropout
                 encoded = tf.layers.Dropout(self._flags.dropout_rate)(encoded, training=dropout)
@@ -74,14 +75,15 @@ class Transformer:
                 embedded = tf.contrib.layers.embed_sequence(decoder_inputs,
                                                             vocab_size=self._de_vocab_size,
                                                             embed_dim=self._flags.mlp_units,
+                                                            scope='Decoder',
                                                             reuse=tf.AUTO_REUSE)
                 key_masks = tf.expand_dims(tf.sign(tf.reduce_sum(tf.abs(embedded), axis=-1)), -1)
 
                 # Perform positional encoding
                 decoded = modules.positional_encoding(decoder_inputs, num_units=self._flags.mlp_units,
                                                       reuse=tf.AUTO_REUSE)
-                decoded += embedded
-                decoded *= key_masks
+                decoded += tf.cast(embedded, tf.float64)
+                decoded *= tf.cast(key_masks, tf.float64)
 
                 # Perform dropout
                 decoded = tf.layers.Dropout(self._flags.dropout_rate)(decoded, training=dropout)
@@ -140,7 +142,8 @@ class Transformer:
         with tf.name_scope('loss'):
             y_smoothed = modules.label_smoothing(tf.one_hot(labels, depth=self._de_vocab_size))
             loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=y_smoothed)
-            loss = tf.reduce_sum(loss * is_target) / tf.reduce_sum(is_target)
+            loss = tf.reduce_sum(loss * tf.cast(is_target, tf.float64)) / tf.cast(
+                tf.reduce_sum(is_target), tf.float64)
 
         return loss, acc
 

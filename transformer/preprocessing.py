@@ -19,7 +19,8 @@ def make_vocabulary(infile, outfile):
     """
     # Read raw data from infile
     if os.path.exists(outfile):
-        return -1
+        with open(outfile, 'r') as f:
+            return len(f.readlines())
 
     with codecs.open(infile, 'r', 'utf-8') as f:
         text = regex.sub('[^\s\p{Latin}\']', '', f.read())

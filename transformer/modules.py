@@ -63,7 +63,7 @@ def positional_encoding(inputs, num_units, scope="positional_encoding", reuse=No
     -------
         Output tensor.
     """
-    batch_size, sequence_len = tf.shape(inputs)
+    batch_size, sequence_len = 32, 15
 
     with tf.variable_scope(scope, reuse=reuse):
         position_ind = tf.tile(tf.expand_dims(tf.range(sequence_len), 0), [batch_size, 1])
@@ -114,7 +114,7 @@ def multihead_attention(queries, keys, num_units=None, num_heads=8, dropout_rate
     with tf.variable_scope(scope, reuse=reuse):
         # Set the fall back option for num_units
         if num_units is None:
-            num_units = tf.shape(queries)[-1]
+            num_units = queries.get_shape().as_list()[-1]
 
         # Linear projections
         query = tf.layers.Dense(num_units, activation=tf.nn.relu)(queries)  # (N, T_q, C)
@@ -130,7 +130,7 @@ def multihead_attention(queries, keys, num_units=None, num_heads=8, dropout_rate
         outputs = tf.matmul(query, tf.transpose(key, [0, 2, 1]))  # (h*N, T_q, T_k)
 
         # Scale
-        outputs = outputs / (tf.shape(key)[-1] ** 0.5)
+        outputs = outputs / (key.get_shape().as_list()[-1] ** 0.5)
 
         # Key Masking
         key_masks = tf.sign(tf.reduce_sum(tf.abs(keys), axis=-1))  # (N, T_k)
@@ -145,7 +145,7 @@ def multihead_attention(queries, keys, num_units=None, num_heads=8, dropout_rate
         if causality:
             diag_vals = tf.ones_like(outputs[0, :, :])  # (T_q, T_k)
             tril = tf.linalg.LinearOperatorLowerTriangular(diag_vals).to_dense()  # (T_q, T_k)
-            masks = tf.tile(tf.expand_dims(tril, 0), [tf.shape(outputs)[0], 1, 1])  # (h*N, T_q, T_k)
+            masks = tf.tile(tf.expand_dims(tril, 0), [outputs.get_shape().as_list()[0], 1, 1])  # (h*N, T_q, T_k)
 
             paddings = tf.ones_like(masks) * (-2 ** 32 + 1)
             outputs = tf.where(tf.equal(masks, 0), paddings, outputs)  # (h*N, T_q, T_k)
@@ -157,7 +157,7 @@ def multihead_attention(queries, keys, num_units=None, num_heads=8, dropout_rate
         query_masks = tf.sign(tf.reduce_sum(tf.abs(queries), axis=-1))  # (N, T_q)
         query_masks = tf.tile(query_masks, [num_heads, 1])  # (h*N, T_q)
         query_masks = tf.tile(tf.expand_dims(query_masks, -1),
-                              [1, 1, tf.shape(keys)[1]])  # (h*N, T_q, T_k)
+                              [1, 1, keys.get_shape().as_list()[1]])  # (h*N, T_q, T_k)
         outputs *= query_masks  # broadcasting. (N, T_q, C)
 
         # Dropouts
@@ -220,5 +220,5 @@ def label_smoothing(inputs, epsilon=0.1):
     -------
         Smoothed labels.
     """
-    channels = tf.shape(inputs)[-1]
-    return ((1 - epsilon) * inputs) + (epsilon / channels)
+    channels = inputs.get_shape().as_list()[-1]
+    return (1 - epsilon) * inputs + (epsilon / channels)
