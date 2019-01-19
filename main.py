@@ -29,24 +29,25 @@ def main():
     # Model hyperparameters
     argparser.add_argument('--logdir', type=str, default='./tmp/model',
                            help='Path to model checkpoint directory.')
-    argparser.add_argument('--num_epochs', type=int, default=10, help='Number of epochs to train for.')
-    argparser.add_argument('--batch_size', type=int, default=16, help='Size of each batch.')
+    argparser.add_argument('--num_epochs', type=int, default=100, help='Number of epochs to train for.')
+    argparser.add_argument('--batch_size', type=int, default=32, help='Size of each batch.')
     argparser.add_argument('--learning_rate', type=float, default=1e-4, help='Parameter update rate.')
-    argparser.add_argument('--encoder_blocks', type=int, choices=range(1, 7),
+    argparser.add_argument('--mhdpa_heads', type=int, default=8, help='Number of heads in MHDPA module.')
+    argparser.add_argument('--mlp_units', type=int, default=512, help='Number of MLP units.')
+    argparser.add_argument('--mhdpa_blocks', type=int, default=6, choices=range(1, 10),
                            help='Number of MHDPA blocks to use in encoder.')
-    argparser.add_argument('--decoder_blocks', type=int, choices=range(1, 7),
-                           help='Number of Masked MHDPA + MHDPA blocks to use in decoder')
+    argparser.add_argument('--dropout_rate', type=float, default=0.1, help='Dropout rate.')
 
     # Parse arguments
     flags = argparser.parse_args()
 
     # Make vocabularies
-    preprocessing.make_vocabulary(flags.train_inputs, flags.en_vocab_path)
-    preprocessing.make_vocabulary(flags.train_labels, flags.de_vocab_path)
+    en_vocab_size = preprocessing.make_vocabulary(flags.train_inputs, flags.en_vocab_path)
+    de_vocab_size = preprocessing.make_vocabulary(flags.train_labels, flags.de_vocab_path)
     (x_train, y_train), (x_val, y_val), _ = preprocessing.create_datasets(flags)
 
     # Create model
-    model = Transformer(flags)
+    model = Transformer(flags, en_vocab_size, de_vocab_size)
     model.fit(x_train, y_train, x_val, y_val)
 
 

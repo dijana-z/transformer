@@ -19,7 +19,7 @@ def make_vocabulary(infile, outfile):
     """
     # Read raw data from infile
     if os.path.exists(outfile):
-        return
+        return -1
 
     with codecs.open(infile, 'r', 'utf-8') as f:
         text = regex.sub('[^\s\p{Latin}\']', '', f.read())
@@ -32,13 +32,16 @@ def make_vocabulary(infile, outfile):
         os.makedirs(os.path.dirname(outfile))
 
     # Write sorted word index to outfile
+    num_lines = 4
     with codecs.open(outfile, 'w', 'utf-8') as f:
         writer = csv.DictWriter(f, ['TOKEN', 'FREQUENCY'])
         writer.writeheader()
         writer.writerows(
             [{'TOKEN': token, 'FREQUENCY': 10000000} for token in ['<PAD>', '<UNK>', '<S>', '</S>']])
         for word, count in word_counts.most_common(len(word_counts)):
+            num_lines += 1
             writer.writerow({'TOKEN': word, 'FREQUENCY': count})
+    return num_lines
 
 
 def load_vocabulary(infile, min_occurrences=50):
