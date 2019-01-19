@@ -46,7 +46,9 @@ class Transformer:
                 key_masks = tf.expand_dims(tf.sign(tf.reduce_sum(tf.abs(embedded), axis=-1)), axis=-1)
 
                 # Perform positional encoding
-                encoded = modules.positional_encoding(inputs, num_units=self._flags.mlp_units,
+                encoded = modules.positional_encoding(inputs,
+                                                      batch_size=self._flags.batch_size,
+                                                      num_units=self._flags.mlp_units,
                                                       reuse=tf.AUTO_REUSE)
                 encoded += tf.cast(embedded, tf.float64)
                 encoded *= tf.cast(key_masks, tf.float64)
@@ -79,7 +81,9 @@ class Transformer:
                 key_masks = tf.expand_dims(tf.sign(tf.reduce_sum(tf.abs(embedded), axis=-1)), -1)
 
                 # Perform positional encoding
-                decoded = modules.positional_encoding(decoder_inputs, num_units=self._flags.mlp_units,
+                decoded = modules.positional_encoding(decoder_inputs,
+                                                      batch_size=self._flags.batch_size,
+                                                      num_units=self._flags.mlp_units,
                                                       reuse=tf.AUTO_REUSE)
                 decoded += tf.cast(embedded, tf.float64)
                 decoded *= tf.cast(key_masks, tf.float64)

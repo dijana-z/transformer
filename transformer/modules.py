@@ -2,32 +2,15 @@ import numpy as np
 import tensorflow as tf
 
 
-def normalize(inputs, scope="ln", reuse=None):
-    """Normalizes network layers.
-
-    Parameters
-    ----------
-    inputs:
-        Input tensors.
-    scope:
-        Variable scope.
-    reuse:
-        Indicator whether to reuse weights.
-
-    Returns
-    -------
-        Normalized tensor.
-    """
-    return tf.contrib.layers.layer_norm(inputs, reuse=reuse, scope=scope)
-
-
-def positional_encoding(inputs, num_units, scope="positional_encoding", reuse=None):
+def positional_encoding(inputs, batch_size, num_units, scope="positional_encoding", reuse=None):
     """Sinusoidal positional encoding.
 
     Parameters
     ----------
     inputs:
         Input tensors.
+    batch_size:
+        Size of each batch.
     num_units:
         Output dimensions.
     scope:
@@ -39,8 +22,7 @@ def positional_encoding(inputs, num_units, scope="positional_encoding", reuse=No
     -------
         Output tensor.
     """
-    batch_size, sequence_len = 32, 15
-    # batch_size, sequence_len = inputs.get_shape().as_list()
+    sequence_len = inputs.get_shape.as_list()[1]
 
     with tf.variable_scope(scope, reuse=reuse):
         position_ind = tf.tile(tf.expand_dims(tf.range(sequence_len), 0), [batch_size, 1])
@@ -151,7 +133,7 @@ def multihead_attention(queries, keys, num_units=None, num_heads=8, dropout_rate
         outputs += queries
 
         # Normalize
-        outputs = normalize(outputs)  # (N, T_q, C)
+        outputs = tf.contrib.layers.layer_norm(outputs, reuse=reuse, scope='ln')  # (N, T_q, C)
 
     return outputs
 
@@ -178,7 +160,7 @@ def feedforward(inputs, num_units=[2048, 512], scope="multihead_attention", reus
     with tf.variable_scope(scope, reuse=reuse):
         outputs = tf.layers.Conv1D(filters=num_units[0], kernel_size=1, activation=tf.nn.relu)(inputs)
         outputs = tf.layers.Conv1D(filters=num_units[1], kernel_size=1)(outputs)
-        outputs = normalize(outputs + inputs)
+        tf.contrib.layers.layer_norm(outputs + inputs, reuse=reuse, scope='ln')
 
     return outputs
 
