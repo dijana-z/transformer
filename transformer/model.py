@@ -18,7 +18,6 @@ class Transformer:
         self._en_vocab_size = en_vocab_size
         self._de_vocab_size = de_vocab_size
 
-    # TODO: Implement model
     def _build_model(self, inputs, labels, dropout):
         """Build model.
 
@@ -116,7 +115,6 @@ class Transformer:
             logits = tf.layers.Dense(units=self._de_vocab_size)(decoded)
         return logits
 
-    # TODO: Implement network operations
     def _build(self, inputs, labels, dropout):
         """Builds model and graph operations.
 
