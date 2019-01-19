@@ -1,11 +1,13 @@
 import tensorflow as tf
 
+from transformer import modules
+
 
 # noinspection PyMethodMayBeStatic
 class Transformer:
     """Variant of the Transformer model from Attention Is All You Need."""
 
-    def __init__(self, flags):
+    def __init__(self, flags, en_vocab_size, de_vocab_size):
         """
         Parameters
         ----------
@@ -13,15 +15,19 @@ class Transformer:
             Namespace object with model parameters.
         """
         self._flags = flags
+        self._en_vocab_size = en_vocab_size
+        self._de_vocab_size = de_vocab_size
 
     # TODO: Implement model
-    def _build_model(self, inputs, dropout):
+    def _build_model(self, inputs, labels, dropout):
         """Build model.
 
         Parameters
         ----------
         inputs:
             Input tensors.
+        labels:
+            Input labels.
         dropout:
             Whether to apply dropout.
 
@@ -30,7 +36,82 @@ class Transformer:
             logits: Unscaled network outputs.
         """
         with tf.variable_scope('Transformer', reuse=tf.AUTO_REUSE):
-            logits = tf.layers.Dense(units=15)(tf.cast(inputs, tf.float32))
+            # Encoder
+            with tf.variable_scope('Encoder'):
+                # Embed inputs
+                embedded = tf.contrib.layers.embed_sequence(inputs,
+                                                            vocab_size=self._en_vocab_size,
+                                                            embed_dim=self._flags.mlp_units,
+                                                            reuse=tf.AUTO_REUSE)
+                key_masks = tf.expand_dims(tf.sign(tf.reduce_sum(tf.abs(embedded), axis=-1)), axis=-1)
+
+                # Perform positional encoding
+                encoded = modules.positional_encoding(inputs, num_units=self._flags.mlp_units,
+                                                      reuse=tf.AUTO_REUSE)
+                encoded += embedded
+                encoded *= key_masks
+
+                # Perform Dropout
+                encoded = tf.layers.Dropout(self._flags.dropout_rate)(encoded, training=dropout)
+
+                # Apply MHDPA modules
+                for i in range(self._flags.mhdpa_blocks):
+                    with tf.variable_scope(f'MHDPA{i}', reuse=tf.AUTO_REUSE):
+                        encoded = modules.multihead_attention(queries=encoded,
+                                                              keys=encoded,
+                                                              num_units=self._flags.mlp_units,
+                                                              num_heads=self._flags.mhdpa_heads,
+                                                              dropout_rate=self._flags.dropout_rate,
+                                                              is_training=dropout,
+                                                              causality=False)
+                        encoded = modules.feedforward(encoded,
+                                                      num_units=[4 * self._flags.mlp_units,
+                                                                 self._flags.mlp_units])
+            # Decoder
+            with tf.variable_scope('Decoder', reuse=tf.AUTO_REUSE):
+                # Embed decoder inputs
+                decoder_inputs = tf.concat((tf.ones_like(labels[:, :1]) * 2, labels[:, :-1]), -1)
+                embedded = tf.contrib.layers.embed_sequence(decoder_inputs,
+                                                            vocab_size=self._de_vocab_size,
+                                                            embed_dim=self._flags.mlp_units,
+                                                            reuse=tf.AUTO_REUSE)
+                key_masks = tf.expand_dims(tf.sign(tf.reduce_sum(tf.abs(embedded), axis=-1)), -1)
+
+                # Perform positional encoding
+                decoded = modules.positional_encoding(decoder_inputs, num_units=self._flags.mlp_units,
+                                                      reuse=tf.AUTO_REUSE)
+                decoded += embedded
+                decoded *= key_masks
+
+                # Perform dropout
+                decoded = tf.layers.Dropout(self._flags.dropout_rate)(decoded, training=dropout)
+
+                # Apply Masked MHDPA + MHDPA
+                for i in range(self._flags.mhdpa_blocks):
+                    with tf.variable_scope(f'MMHDPA{i}', reuse=tf.AUTO_REUSE):
+                        # Apply Masked MHDPA block
+                        decoded = modules.multihead_attention(queries=decoded,
+                                                              keys=decoded,
+                                                              num_units=self._flags.mlp_units,
+                                                              num_heads=self._flags.mhdpa_heads,
+                                                              dropout_rate=self._flags.dropout_rate,
+                                                              is_training=dropout,
+                                                              causality=True,
+                                                              scope='Masked')
+                        # Apply MHDPA block
+                        decoded = modules.multihead_attention(queries=decoded,
+                                                              keys=decoded,
+                                                              num_units=self._flags.mlp_units,
+                                                              num_heads=self._flags.mhdpa_heads,
+                                                              dropout_rate=self._flags.dropout_rate,
+                                                              is_training=dropout,
+                                                              causality=False,
+                                                              scope='Vanilla')
+                        decoded = modules.feedforward(decoded,
+                                                      num_units=[4 * self._flags.mlp_units,
+                                                                 self._flags.mlp_units])
+
+            logits = tf.layers.Dense(units=self._de_vocab_size)(decoded)
         return logits
 
     # TODO: Implement network operations
@@ -46,15 +127,22 @@ class Transformer:
 
         Returns
         -------
-            ...
+            loss, acc: Loss and accuracy operations
         """
-        logits = self._build_model(inputs, dropout)
+        logits = self._build_model(inputs, labels, dropout)
+
+        with tf.name_scope('acc'):
+            predictions = tf.to_int32(tf.arg_max(logits, dimension=-1))
+            is_target = tf.to_float(tf.not_equal(labels, 0))
+            acc = tf.reduce_sum(tf.to_float(tf.equal(predictions, labels)) * is_target) / tf.reduce_sum(
+                is_target)
 
         with tf.name_scope('loss'):
-            loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels, logits=logits)
-            loss = tf.reduce_mean(loss)
+            y_smoothed = modules.label_smoothing(tf.one_hot(labels, depth=self._de_vocab_size))
+            loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=y_smoothed)
+            loss = tf.reduce_sum(loss * is_target) / tf.reduce_sum(is_target)
 
-        return loss
+        return loss, acc
 
     def fit(self, x_train, y_train, x_val, y_val):
         """Fit model on passed data.
@@ -88,14 +176,14 @@ class Transformer:
         val_inputs, val_labels = val_it.get_next()
 
         # Create network ops
-        train_loss = self._build(train_inputs, train_labels, dropout=True)
-        val_loss = self._build(val_inputs, val_labels, dropout=False)
+        train_loss, train_acc = self._build(train_inputs, train_labels, dropout=True)
+        val_loss, val_acc = self._build(val_inputs, val_labels, dropout=False)
 
         # Create summaries
         tf.summary.scalar('loss/train', train_loss)
         tf.summary.scalar('loss/val', val_loss)
-        # tf.summary.scalar('acc/train', train_acc)
-        # tf.summary.scalar('acc/val', val_acc)
+        tf.summary.scalar('acc/train', train_acc)
+        tf.summary.scalar('acc/val', val_acc)
 
         # Create optimizer
         g_step = tf.train.get_or_create_global_step()
@@ -114,10 +202,10 @@ class Transformer:
                                                save_summaries_steps=10) as sess:
             batches = 0
             while not sess.should_stop():
-                sess.run([optimizer, train_loss])
+                sess.run([optimizer, train_loss, train_acc])
                 batches += 1
                 if batches % 1000 == 0:
-                    sess.run([val_loss])
+                    sess.run([val_loss, val_acc])
 
     def eval(self, test_dataset):
         """Evaluate model on test data.
