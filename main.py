@@ -63,9 +63,7 @@ def main():
         print(f'[loss: {loss}; acc: {acc}]')
     elif flags.mode == 'predict':
         indices = np.random.randint(0, len(x_test), size=flags.batch_size)
-        output_sentence = model.predict(x_test[indices], y_test[indices])
-        print(f'Output sentence: {output_sentence}')
-
+        model.predict(x_test[indices], y_test[indices])
 
 if __name__ == '__main__':
     main()

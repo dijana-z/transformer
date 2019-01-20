@@ -2,6 +2,7 @@ from functools import reduce
 
 import numpy as np
 import tensorflow as tf
+from nltk.translate import bleu_score
 
 from transformer import modules, preprocessing
 
@@ -265,6 +266,9 @@ class Transformer:
             output: Generated translation.
         """
         # Load vocabularies
+        expected_shape = (self._flags.batch_size, self._flags.sequence_length)
+        assert inputs.shape == expected_shape, f'Invalid input shape, expected {expected_shape}, got {inputs.shape}'
+
         def ind_to_sentence(seq, index):
             return reduce(lambda w, a: w + ' ' + a, [index[int(e)] for e in seq]).split('</S>')[0]
 
@@ -286,7 +290,7 @@ class Transformer:
 
             # Perform autoregressive inference
             for i in range(self._flags.sequence_length):
-                autoreg = sess.run(predictions, feed_dict={x: inputs, y: output_sequence})
+                autoreg = sess.run(predictions, feed_dict={x: inputs, y: labels})
                 output_sequence[:, i] = autoreg[:, i]
 
             output_sequence = [ind_to_sentence(e, de_itw) for e in output_sequence]
@@ -294,6 +298,7 @@ class Transformer:
             labels = [ind_to_sentence(e, de_itw) for e in labels]
 
             for s, t, o in zip(inputs, labels, output_sequence):
+                print()
                 print(f'--input: {s}')
                 print(f'--true: {t}')
                 print(f'--prediction: {o}')
