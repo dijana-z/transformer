@@ -250,28 +250,26 @@ class Transformer:
 
         return loss / batches, acc / batches
 
-    def predict(self, inputs):
+    def predict(self, inputs, labels):
         """Perform inference on input sentence.
 
         Parameters
         ----------
         inputs:
             Input sentence.
+        labels:
+            True translation.
 
         Returns
         -------
             output: Generated translation.
         """
         # Load vocabularies
-        en_idx, _ = preprocessing.load_vocabulary(self._flags.en_vocab_path)
-        _, idx_de = preprocessing.load_vocabulary(self._flags.de_vocab_path)
+        def ind_to_sentence(seq, index):
+            return reduce(lambda w, a: w + ' ' + a, [index[int(e)] for e in seq]).split('</S>')[0]
 
-        # Create sentence from input sequence
-        line = preprocessing.refine(inputs).split()
-        input_template = np.zeros((1, 15))
-        input_sequence = np.array([en_idx[word] for word in line])
-        input_template[:, :len(input_sequence)] = np.expand_dims(input_sequence, axis=0)
-        input_sequence = input_template
+        en_wti, en_itw = preprocessing.load_vocabulary(self._flags.en_vocab_path)
+        de_wti, de_itw = preprocessing.load_vocabulary(self._flags.de_vocab_path)
 
         # Create placeholders
         x = tf.placeholder(dtype=tf.int32, shape=[None, self._flags.sequence_length])
@@ -282,16 +280,20 @@ class Transformer:
         predictions = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
 
         # Create session and load model weights.
-        with tf.train.SingularMonitoredSession(checkpoint_dir=self._flags.logdir,
-                                               config=self._tf_config) as sess:
-            # Initialize outputs
-            output_sequence = np.zeros([1, self._flags.sequence_length], dtype=np.int32)
+        with tf.train.SingularMonitoredSession(checkpoint_dir=self._flags.logdir, config=self._tf_config) as sess:
+            # Initialize output sequence
+            output_sequence = np.zeros_like(inputs, dtype=np.int32)
 
             # Perform autoregressive inference
             for i in range(self._flags.sequence_length):
-                autoreg = sess.run(predictions, feed_dict={x: input_sequence, y: output_sequence})
-                output_sequence[:, i] = autoreg[0, i]
+                autoreg = sess.run(predictions, feed_dict={x: inputs, y: output_sequence})
+                output_sequence[:, i] = autoreg[:, i]
 
-            # TODO: Reconstruct sentence from predictions
+            output_sequence = [ind_to_sentence(e, de_itw) for e in output_sequence]
+            inputs = [ind_to_sentence(e, en_itw) for e in inputs]
+            labels = [ind_to_sentence(e, de_itw) for e in labels]
 
-        return output_sequence
+            for s, t, o in zip(inputs, labels, output_sequence):
+                print(f'--input: {s}')
+                print(f'--true: {t}')
+                print(f'--prediction: {o}')

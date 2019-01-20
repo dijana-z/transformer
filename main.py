@@ -1,3 +1,4 @@
+import numpy as np
 from argparse import ArgumentParser
 
 from transformer import preprocessing
@@ -61,8 +62,8 @@ def main():
         loss, acc = model.eval(x_test, y_test)
         print(f'[loss: {loss}; acc: {acc}]')
     elif flags.mode == 'predict':
-        sentence = input('Source sentence: ')
-        output_sentence = model.predict(sentence)
+        indices = np.random.randint(0, len(x_test), size=flags.batch_size)
+        output_sentence = model.predict(x_test[indices], y_test[indices])
         print(f'Output sentence: {output_sentence}')
 
 
