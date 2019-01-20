@@ -76,67 +76,66 @@ def multihead_attention(queries, keys, num_units=None, num_heads=8, dropout_rate
             num_units = queries.get_shape().as_list()[-1]
 
         # Linear projections
-        query = tf.layers.Dense(num_units, activation=tf.nn.relu)(queries)  # (N, T_q, C)
-        key = tf.layers.Dense(num_units, activation=tf.nn.relu)(keys)  # (N, T_k, C)
-        value = tf.layers.Dense(num_units, activation=tf.nn.relu)(keys)  # (N, T_k, C)
+        query = tf.layers.Dense(num_units, activation=tf.nn.relu)(queries)
+        key = tf.layers.Dense(num_units, activation=tf.nn.relu)(keys)
+        value = tf.layers.Dense(num_units, activation=tf.nn.relu)(keys)
 
         # Split and concat
-        query = tf.concat(tf.split(query, num_heads, axis=2), axis=0)  # (h*N, T_q, C/h)
-        key = tf.concat(tf.split(key, num_heads, axis=2), axis=0)  # (h*N, T_k, C/h)
-        value = tf.concat(tf.split(value, num_heads, axis=2), axis=0)  # (h*N, T_k, C/h)
+        query = tf.concat(tf.split(query, num_heads, axis=2), axis=0)
+        key = tf.concat(tf.split(key, num_heads, axis=2), axis=0)
+        value = tf.concat(tf.split(value, num_heads, axis=2), axis=0)
 
         # Multiplication
-        outputs = tf.matmul(query, tf.transpose(key, [0, 2, 1]))  # (h*N, T_q, T_k)
+        outputs = tf.matmul(query, tf.transpose(key, [0, 2, 1]))
 
         # Scale
         outputs = outputs / (key.get_shape().as_list()[-1] ** 0.5)
 
         # Key Masking
-        key_masks = tf.sign(tf.reduce_sum(tf.abs(keys), axis=-1))  # (N, T_k)
-        key_masks = tf.tile(key_masks, [num_heads, 1])  # (h*N, T_k)
-        key_masks = tf.tile(tf.expand_dims(key_masks, 1), [1, tf.shape(queries)[1], 1])  # (h*N, T_q, T_k)
+        key_masks = tf.sign(tf.reduce_sum(tf.abs(keys), axis=-1))
+        key_masks = tf.tile(key_masks, [num_heads, 1])
+        key_masks = tf.tile(tf.expand_dims(key_masks, 1), [1, tf.shape(queries)[1], 1])
 
         paddings = tf.ones_like(outputs) * (-2 ** 32 + 1)
-        outputs = tf.where(tf.equal(key_masks, 0), paddings, outputs)  # (h*N, T_q, T_k)
+        outputs = tf.where(tf.equal(key_masks, 0), paddings, outputs)
 
         # Causality = Future blinding
         if causality:
-            diag_vals = tf.ones_like(outputs[0, :, :])  # (T_q, T_k)
-            tril = tf.linalg.LinearOperatorLowerTriangular(diag_vals).to_dense()  # (T_q, T_k)
-            masks = tf.tile(tf.expand_dims(tril, 0), [outputs.get_shape().as_list()[0], 1, 1])  # (h*N, T_q, T_k)
+            diag_vals = tf.ones_like(outputs[0, :, :])
+            tril = tf.linalg.LinearOperatorLowerTriangular(diag_vals).to_dense()
+            masks = tf.tile(tf.expand_dims(tril, 0), [outputs.get_shape().as_list()[0], 1, 1])
 
             paddings = tf.ones_like(masks) * (-2 ** 32 + 1)
-            outputs = tf.where(tf.equal(masks, 0), paddings, outputs)  # (h*N, T_q, T_k)
+            outputs = tf.where(tf.equal(masks, 0), paddings, outputs)
 
         # Activation
-        outputs = tf.nn.softmax(outputs)  # (h*N, T_q, T_k)
+        outputs = tf.nn.softmax(outputs)
 
         # Query Masking
-        query_masks = tf.sign(tf.reduce_sum(tf.abs(queries), axis=-1))  # (N, T_q)
-        query_masks = tf.tile(query_masks, [num_heads, 1])  # (h*N, T_q)
-        query_masks = tf.tile(tf.expand_dims(query_masks, -1), [1, 1, keys.get_shape().as_list()[1]])  # (h*N, T_q, T_k)
-        outputs *= query_masks  # broadcasting. (N, T_q, C)
+        query_masks = tf.sign(tf.reduce_sum(tf.abs(queries), axis=-1))
+        query_masks = tf.tile(query_masks, [num_heads, 1])
+        query_masks = tf.tile(tf.expand_dims(query_masks, -1), [1, 1, keys.get_shape().as_list()[1]])
+        outputs *= query_masks
 
         # Dropouts
         outputs = tf.layers.dropout(outputs, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
 
         # Weighted sum
-        outputs = tf.matmul(outputs, value)  # ( h*N, T_q, C/h)
+        outputs = tf.matmul(outputs, value)
 
         # Restore shape
-        outputs = tf.concat(tf.split(outputs, num_heads, axis=0), axis=2)  # (N, T_q, C)
+        outputs = tf.concat(tf.split(outputs, num_heads, axis=0), axis=2)
 
         # Residual connection
         outputs += queries
 
         # Normalize
-        outputs = tf.contrib.layers.layer_norm(outputs, reuse=reuse, scope='ln')  # (N, T_q, C)
+        outputs = tf.contrib.layers.layer_norm(outputs, reuse=reuse, scope='ln')
 
     return outputs
 
 
-# noinspection PyDefaultArgument
-def feedforward(inputs, num_units=[2048, 512], scope="multihead_attention", reuse=None):
+def feedforward(inputs, num_units, scope="multihead_attention", reuse=None):
     """Makes feed forward network.
 
     Parameters
