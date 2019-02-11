@@ -97,7 +97,7 @@ def create_data(source_sentences, target_sentences, en_vocab_file, de_vocab_file
         x = [en_wti.get(word, 1) for word in source.split()] + [en_wti['</S>']]
         y = [de_wti.get(word, 1) for word in target.split()] + [de_wti['</S>']]
 
-        if max(len(x), len(y)) < maxlen:
+        if max(len(x), len(y)) <= maxlen:
             x_data.append(x)
             y_data.append(y)
             sources.append(source)

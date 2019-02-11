@@ -2,7 +2,6 @@ from functools import reduce
 
 import numpy as np
 import tensorflow as tf
-from nltk.translate import bleu_score
 
 from transformer import modules, preprocessing
 
@@ -53,11 +52,11 @@ class Transformer:
                 key_masks = tf.expand_dims(tf.sign(tf.reduce_sum(tf.abs(embedded), axis=-1)), axis=-1)
 
                 # Perform positional encoding
-                encoded = modules.positional_encoding(inputs,
-                                                      batch_size=self._flags.batch_size,
-                                                      num_units=self._flags.mlp_units,
-                                                      reuse=tf.AUTO_REUSE)
-                encoded += tf.cast(embedded, tf.float64)
+                encoding = modules.positional_encoding(inputs,
+                                                       batch_size=self._flags.batch_size,
+                                                       num_units=self._flags.mlp_units,
+                                                       reuse=tf.AUTO_REUSE)
+                encoded = tf.cast(embedded, tf.float64) + encoding
                 encoded *= tf.cast(key_masks, tf.float64)
 
                 # Perform Dropout
@@ -88,11 +87,11 @@ class Transformer:
                 key_masks = tf.expand_dims(tf.sign(tf.reduce_sum(tf.abs(embedded), axis=-1)), -1)
 
                 # Perform positional encoding
-                decoded = modules.positional_encoding(inputs,
-                                                      batch_size=self._flags.batch_size,
-                                                      num_units=self._flags.mlp_units,
-                                                      reuse=tf.AUTO_REUSE)
-                decoded += tf.cast(embedded, tf.float64)
+                decoding = modules.positional_encoding(inputs,
+                                                       batch_size=self._flags.batch_size,
+                                                       num_units=self._flags.mlp_units,
+                                                       reuse=tf.AUTO_REUSE)
+                decoded = tf.cast(embedded, tf.float64) + decoding
                 decoded *= tf.cast(key_masks, tf.float64)
 
                 # Perform dropout
@@ -112,7 +111,7 @@ class Transformer:
                                                               scope='Masked')
                         # Apply MHDPA block
                         decoded = modules.multihead_attention(queries=decoded,
-                                                              keys=decoded,
+                                                              keys=encoded,
                                                               num_units=self._flags.mlp_units,
                                                               num_heads=self._flags.mhdpa_heads,
                                                               dropout_rate=self._flags.dropout_rate,
