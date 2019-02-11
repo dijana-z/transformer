@@ -1,5 +1,6 @@
-import numpy as np
 from argparse import ArgumentParser
+
+import numpy as np
 
 from transformer import preprocessing
 from transformer.model import Transformer
@@ -30,7 +31,7 @@ def main():
     # Model hyperparameters
     argparser.add_argument('--logdir', type=str, default='./tmp/model',
                            help='Path to model checkpoint directory.')
-    argparser.add_argument('--num_epochs', type=int, default=100, help='Number of epochs to train for.')
+    argparser.add_argument('--num_epochs', type=int, default=10, help='Number of epochs to train for.')
     argparser.add_argument('--batch_size', type=int, default=32, help='Size of each batch.')
     argparser.add_argument('--learning_rate', type=float, default=1e-4, help='Parameter update rate.')
     argparser.add_argument('--mhdpa_heads', type=int, default=8, help='Number of heads in MHDPA module.')
@@ -64,6 +65,7 @@ def main():
     elif flags.mode == 'predict':
         indices = np.random.randint(0, len(x_test), size=flags.batch_size)
         model.predict(x_test[indices], y_test[indices])
+
 
 if __name__ == '__main__':
     main()
