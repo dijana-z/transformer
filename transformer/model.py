@@ -296,8 +296,4 @@ class Transformer:
             inputs = [ind_to_sentence(e, en_itw) for e in inputs]
             labels = [ind_to_sentence(e, de_itw) for e in labels]
 
-            for s, t, o in zip(inputs, labels, output_sequence):
-                print()
-                print(f'--input: {s}')
-                print(f'--true: {t}')
-                print(f'--prediction: {o}')
+        return inputs, labels, output_sequence
