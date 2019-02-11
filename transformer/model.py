@@ -289,7 +289,7 @@ class Transformer:
 
             # Perform autoregressive inference
             for i in range(self._flags.sequence_length):
-                autoreg = sess.run(predictions, feed_dict={x: inputs, y: labels})
+                autoreg = sess.run(predictions, feed_dict={x: inputs, y: output_sequence})
                 output_sequence[:, i] = autoreg[:, i]
 
             output_sequence = [ind_to_sentence(e, de_itw) for e in output_sequence]
