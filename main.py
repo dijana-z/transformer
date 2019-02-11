@@ -64,7 +64,11 @@ def main():
         print(f'[loss: {loss}; acc: {acc}]')
     elif flags.mode == 'predict':
         indices = np.random.randint(0, len(x_test), size=flags.batch_size)
-        model.predict(x_test[indices], y_test[indices])
+        inputs, true_outputs, predicted_outputs = model.predict(x_test[indices], y_test[indices])
+        for s, o, p in zip(inputs, true_outputs, predicted_outputs):
+            print('INPUT: ', s)
+            print('TRUE: ', o)
+            print('PREDICTED: ', p)
 
 
 if __name__ == '__main__':
