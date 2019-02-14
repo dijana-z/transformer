@@ -28,6 +28,23 @@ def make_vocabulary(infile, outfile):
     # Count words in corpora
     word_counts = Counter(text.split())
 
+    return word_count_to_vocabulary(word_counts, outfile)
+
+
+def word_count_to_vocabulary(counts, outfile):
+    """Create vocabulary from word counter.
+
+    Parameters
+    ----------
+    counts:
+        Counter with word frequencies.
+    outfile:
+        Vocabulary output file.
+
+    Returns
+    -------
+        num_lines: Number of words in vocabulary.
+    """
     # Create nested directory
     if not os.path.exists(os.path.dirname(outfile)):
         os.makedirs(os.path.dirname(outfile))
@@ -39,7 +56,7 @@ def make_vocabulary(infile, outfile):
         writer.writeheader()
         writer.writerows(
             [{'TOKEN': token, 'FREQUENCY': 10000000} for token in ['<PAD>', '<UNK>', '<S>', '</S>']])
-        for word, count in word_counts.most_common(len(word_counts)):
+        for word, count in counts.most_common(len(counts)):
             num_lines += 1
             writer.writerow({'TOKEN': word, 'FREQUENCY': count})
     return num_lines
@@ -69,6 +86,7 @@ def load_vocabulary(infile, min_occurrences=50):
     return indexed_words, worded_indexes
 
 
+# noinspection PyTypeChecker
 def create_data(source_sentences, target_sentences, en_vocab_file, de_vocab_file, maxlen=15):
     """Creates encoded sentences.
 
@@ -105,6 +123,45 @@ def create_data(source_sentences, target_sentences, en_vocab_file, de_vocab_file
 
     x_data = pad_sequences(x_data, maxlen=maxlen, padding='post')
     y_data = pad_sequences(y_data, maxlen=maxlen, padding='post')
+
+    return x_data, y_data, sources, targets
+
+
+def create_summary_data(source_sentences, target_sentences, vocab_file, input_maxlen=100, output_maxlen=10):
+    """Creates encoded sentences.
+
+    Parameters
+    ----------
+    source_sentences:
+        Source sentences.
+    target_sentences:
+        Target sentences.
+    vocab_file:
+        File with english vocabulary.
+    input_maxlen:
+        Size of all input sequences.
+    output_maxlen:
+        Size of all output sequences.
+
+    Returns
+    -------
+        Labeled data.
+    """
+    en_wti, en_itw = load_vocabulary(vocab_file)
+    x_data, y_data, sources, targets = [], [], [], []
+
+    for source, target in zip(source_sentences, target_sentences):
+        x = [en_wti.get(word, 1) for word in source.split()] + [en_wti['</S>']]
+        y = [en_wti.get(word, 1) for word in target.split()] + [en_wti['</S>']]
+
+        if len(x) <= input_maxlen and len(y) <= output_maxlen:
+            x_data.append(x)
+            y_data.append(y)
+            sources.append(source)
+            targets.append(target)
+
+    x_data = pad_sequences(x_data, maxlen=input_maxlen, padding='post')
+    y_data = pad_sequences(y_data, maxlen=output_maxlen, padding='post')
 
     return x_data, y_data, sources, targets
 

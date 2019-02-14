@@ -9,7 +9,7 @@ from transformer import modules, preprocessing
 class Transformer:
     """Variant of the Transformer model from Attention Is All You Need."""
 
-    def __init__(self, flags, en_vocab_size, de_vocab_size):
+    def __init__(self, flags, input_vocab_size, output_vocab_size):
         """
         Parameters
         ----------
@@ -17,8 +17,8 @@ class Transformer:
             Namespace object with model parameters.
         """
         self._flags = flags
-        self._en_vocab_size = en_vocab_size
-        self._de_vocab_size = de_vocab_size
+        self._input_vocab_size = input_vocab_size
+        self._output_vocab_size = output_vocab_size
 
         # Create session config
         gpu_options = tf.GPUOptions(allow_growth=True)
@@ -45,7 +45,7 @@ class Transformer:
             with tf.variable_scope('Encoder'):
                 # Embed inputs
                 embedded = tf.contrib.layers.embed_sequence(inputs,
-                                                            vocab_size=self._en_vocab_size,
+                                                            vocab_size=self._input_vocab_size,
                                                             embed_dim=self._flags.mlp_units,
                                                             scope='Encoder',
                                                             reuse=tf.AUTO_REUSE)
@@ -80,7 +80,7 @@ class Transformer:
                 # Embed decoder inputs
                 decoder_inputs = tf.concat((tf.ones_like(labels[:, :1]) * 2, labels[:, :-1]), -1)
                 embedded = tf.contrib.layers.embed_sequence(decoder_inputs,
-                                                            vocab_size=self._de_vocab_size,
+                                                            vocab_size=self._output_vocab_size,
                                                             embed_dim=self._flags.mlp_units,
                                                             scope='Decoder',
                                                             reuse=tf.AUTO_REUSE)
@@ -122,7 +122,7 @@ class Transformer:
                                                       num_units=[4 * self._flags.mlp_units,
                                                                  self._flags.mlp_units])
 
-            logits = tf.layers.Dense(units=self._de_vocab_size)(decoded)
+            logits = tf.layers.Dense(units=self._output_vocab_size)(decoded)
         return logits
 
     def _build(self, inputs, labels, dropout):
@@ -148,7 +148,7 @@ class Transformer:
                                                      labels)) * is_target) / tf.reduce_sum(is_target)
 
         with tf.name_scope('loss'):
-            y_smoothed = modules.label_smoothing(tf.one_hot(labels, depth=self._de_vocab_size))
+            y_smoothed = modules.label_smoothing(tf.one_hot(labels, depth=self._output_vocab_size))
             loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=y_smoothed)
             loss = tf.reduce_sum(loss * tf.cast(is_target, tf.float64)) / tf.cast(
                 tf.reduce_sum(is_target), tf.float64)
