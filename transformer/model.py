@@ -87,7 +87,7 @@ class Transformer:
                 key_masks = tf.expand_dims(tf.sign(tf.reduce_sum(tf.abs(embedded), axis=-1)), -1)
 
                 # Perform positional encoding
-                decoding = modules.positional_encoding(inputs,
+                decoding = modules.positional_encoding(labels,
                                                        batch_size=self._flags.batch_size,
                                                        num_units=self._flags.mlp_units,
                                                        reuse=tf.AUTO_REUSE)
@@ -177,7 +177,7 @@ class Transformer:
         train_dataset = train_dataset.repeat(self._flags.num_epochs).batch(self._flags.batch_size)
         train_dataset = train_dataset.prefetch(buffer_size=10 * self._flags.batch_size)
         train_dataset = train_dataset.shuffle(buffer_size=10 * self._flags.batch_size)
-        val_dataset = val_dataset.repeat().batch(32)
+        val_dataset = val_dataset.repeat().batch(16)
 
         # Create iterators and inputs
         train_it = train_dataset.make_one_shot_iterator()
@@ -206,7 +206,7 @@ class Transformer:
         # Create training session
         with tf.train.MonitoredTrainingSession(checkpoint_dir=self._flags.logdir,
                                                config=self._tf_config,
-                                               save_summaries_steps=10) as sess:
+                                               save_summaries_steps=50) as sess:
             batches = 0
             while not sess.should_stop():
                 sess.run([optimizer, train_loss, train_acc])

@@ -1,12 +1,12 @@
 from argparse import ArgumentParser
 from collections import Counter
 
-import ray
 import numpy as np
+import ray
 import regex
 from modin import pandas as pd
+from sklearn.model_selection import train_test_split
 from tensorflow.contrib.framework import nest
-from tensorflow.contrib.learn.python.learn.estimators._sklearn import train_test_split
 
 from transformer.model import Transformer
 from transformer.preprocessing import word_count_to_vocabulary, create_summary_data
@@ -46,7 +46,7 @@ def main():
 
     # Load raw data
     data_frame = pd.read_csv(flags.input_data)
-    raw_data = data_frame[['Text', 'Summary']].values
+    raw_data = data_frame[['Text', 'Summary']].values[:1000, :]
     raw_inputs, raw_labels = np.transpose(raw_data, [1, 0])
 
     @ray.remote
@@ -62,13 +62,13 @@ def main():
     words = sentences_to_words(raw_inputs) + sentences_to_words(raw_labels)
     word_counts = Counter(words)
     vocab_size = word_count_to_vocabulary(word_counts, flags.vocabulary_file)
-    inputs, labels = create_summary_data(raw_inputs, raw_labels,
-                                         vocab_file=flags.vocabulary_file,
-                                         input_maxlen=flags.input_sequence_length,
-                                         output_maxlen=flags.output_sequence_length)
-    (train_inputs, val_inputs), (train_labels, val_labels) = train_test_split(inputs, labels,
-                                                                              test_size=flags.validation_split,
-                                                                              random_state=69)
+    inputs, labels, reviews, summaires = create_summary_data(raw_inputs, raw_labels,
+                                                             vocab_file=flags.vocabulary_file,
+                                                             input_maxlen=flags.input_sequence_length,
+                                                             output_maxlen=flags.output_sequence_length)
+    train_inputs, val_inputs, train_labels, val_labels = train_test_split(inputs, labels,
+                                                                          test_size=flags.validation_split,
+                                                                          random_state=69)
 
     # Create model
     model = Transformer(flags, vocab_size, vocab_size)

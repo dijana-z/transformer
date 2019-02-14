@@ -127,7 +127,7 @@ def create_data(source_sentences, target_sentences, en_vocab_file, de_vocab_file
     return x_data, y_data, sources, targets
 
 
-def create_summary_data(source_sentences, target_sentences, vocab_file, input_maxlen=100, output_maxlen=10):
+def create_summary_data(source_sentences, target_sentences, vocab_file, input_maxlen=500, output_maxlen=20):
     """Creates encoded sentences.
 
     Parameters
