@@ -206,7 +206,7 @@ class Transformer:
         # Create training session
         with tf.train.MonitoredTrainingSession(checkpoint_dir=self._flags.logdir,
                                                config=self._tf_config,
-                                               save_summaries_steps=50) as sess:
+                                               save_summaries_steps=10) as sess:
             batches = 0
             while not sess.should_stop():
                 sess.run([optimizer, train_loss, train_acc])

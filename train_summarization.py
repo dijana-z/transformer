@@ -46,7 +46,7 @@ def main():
 
     # Load raw data
     data_frame = pd.read_csv(flags.input_data)
-    raw_data = data_frame[['Text', 'Summary']].values[:1000, :]
+    raw_data = data_frame[['Text', 'Summary']].values[:20000, :]
     raw_inputs, raw_labels = np.transpose(raw_data, [1, 0])
 
     @ray.remote
