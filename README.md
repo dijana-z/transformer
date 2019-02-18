@@ -1,11 +1,13 @@
 # :red_car: Transformer
 
-A neural translator based on the model from [Attention Is All You Need](https://arxiv.org/abs/1706.03762), the paper that introduced a novel approach to sequence processing tasks using Attention Mechanisms instead of the classic RNN based approach. They achieved state-of-the-art results while significantly reducing train time and increasing network throughput.
+Implementation of the architecture [Attention Is All You Need](https://arxiv.org/abs/1706.03762), the paper that introduced a novel approach to sequence processing tasks using Attention Mechanisms instead of the classic RNN based approach. They achieved state-of-the-art results while significantly reducing train time and increasing network throughput.
+
+We trained the model on two separate tasks, neural translation, the task from the original paper, and text summarization, the task of generating a short summarization given a long input sequence (eg. a review or article).
 
 ## :information_source: About:
 
 The code is written in Python and uses [TensorFlow](https://www.tensorflow.org/), a deep learning framework created by Google.
-We based our implementation on the model architecture from the paper with a few minor tweaks to accomodate for limited training resources. The architecture is described in the next section.
+We based our implementation on the model architecture from the paper with a few minor tweaks to accommodate for limited training resources. The architecture is described in the next section.
 
 ## :shipit: Model architecture:
 
@@ -21,11 +23,17 @@ Outputs from the decoder pass through a linear layer with a softmax activation t
 
 ![Model](https://camo.githubusercontent.com/88e8f36ce61dedfd2491885b8df2f68c4d1f92f5/687474703a2f2f696d6775722e636f6d2f316b72463252362e706e67)
 ## :computer: Running the code:
+#### Neural translation:
 Get the dataset by running:
 ```
 wget -qO- --show-progress https://wit3.fbk.eu/archive/2016-01//texts/de/en/de-en.tgz | tar xz; mv de-en data
 ```
-Hyperparameters are set via flags passed to the ```main.py``` script in the project root. There are reasonable defaults set so you can just run ```python main.py``` to start training, note that training times can get quite long even on a very powerful PC (>24h).
+Hyperparameters are set via flags passed to the ```train_translation.py``` script in the project root. There are reasonable defaults set so you can just run ```python train_trainslation.py``` to start training, note that training times can get quite long even on a very powerful PC (>24h).
+
+#### Text summarization:
+Get the dataset from [Kaggle](https://www.kaggle.com/snap/amazon-fine-food-reviews/data).
+Hyperparameters are set via flags passed to the ```train_summarization.py``` script in the project root. There are reasonable defaults set so you can just run ```python train_summarization.py``` to start training, note that training times can get quite long even on a very powerful PC (>24h).
+
 
 ## :mortar_board: Authors:
 * Dijana Zulfikaric | dijanaz1996@gmail.com | GitHub &bull; [dijana-z](https://github.com/dijana-z) | LinkedIn &bull; [in/dijana-zulfikaric](https://www.linkedin.com/in/dijana-zulfikaric/)
