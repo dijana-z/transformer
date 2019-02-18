@@ -3,7 +3,8 @@ from functools import reduce
 import numpy as np
 import tensorflow as tf
 
-from transformer import modules, preprocessing
+from transformer import modules
+from transformer.preprocessing import load_vocabulary
 
 
 class Transformer:
@@ -250,50 +251,57 @@ class Transformer:
 
         return loss / batches, acc / batches
 
-    def predict(self, inputs, labels):
-        """Perform inference on input sentence.
 
-        Parameters
-        ----------
-        inputs:
-            Input sentence.
-        labels:
-            True translation.
+def predict(model, logdir, inputs, labels, vocab_file, input_seq_len, output_seq_len):
+    """Generate predictions for summarization.
 
-        Returns
-        -------
-            output: Generated translation.
-        """
-        # Load vocabularies
-        expected_shape = (self._flags.batch_size, self._flags.sequence_length)
-        assert inputs.shape == expected_shape, f'Invalid input shape, expected {expected_shape}, got {inputs.shape}'
+    Parameters
+    ----------
+    model:
+        Model object.
+    logdir:
+        Checkpoint directory for model weights.
+    inputs:
+        A batch of prediction inputs.
+    labels:
+        A batch of prediction labels.
+    vocab_file:
+        Path to file with summarization vocabulary.
+    input_seq_len:
+        Length of input sequence.
+    output_seq_len:
+        Length of output sequence.
 
-        def ind_to_sentence(seq, index):
-            return reduce(lambda w, a: w + ' ' + a, [index[int(e)] for e in seq]).split('</S>')[0]
+    Returns
+    -------
+        preds: A batch of generated predictions.
+    """
 
-        en_wti, en_itw = preprocessing.load_vocabulary(self._flags.en_vocab_path)
-        de_wti, de_itw = preprocessing.load_vocabulary(self._flags.de_vocab_path)
+    def ind_to_sentence(seq, index):
+        return reduce(lambda w, a: w + ' ' + a, [index[int(e)] for e in seq]).split('</S>')[0]
 
-        # Create placeholders
-        x = tf.placeholder(dtype=tf.int32, shape=[None, self._flags.sequence_length])
-        y = tf.placeholder(dtype=tf.int32, shape=[None, self._flags.sequence_length])
+    word_to_index, index_to_word = load_vocabulary(vocab_file)
 
-        # Create network
-        _, _, logits = self._build(x, y, dropout=False)
-        predictions = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
+    x = tf.placeholder(dtype=tf.int32, shape=[None, input_seq_len])
+    y = tf.placeholder(dtype=tf.int32, shape=[None, output_seq_len])
 
-        # Create session and load model weights.
-        with tf.train.SingularMonitoredSession(checkpoint_dir=self._flags.logdir, config=self._tf_config) as sess:
-            # Initialize output sequence
-            output_sequence = np.zeros_like(inputs, dtype=np.int32)
+    # noinspection PyProtectedMember
+    logits = model._build_model(x, y, dropout=False)
+    predictions = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
 
-            # Perform autoregressive inference
-            for i in range(self._flags.sequence_length):
-                autoreg = sess.run(predictions, feed_dict={x: inputs, y: output_sequence})
-                output_sequence[:, i] = autoreg[:, i]
+    gpu_options = tf.GPUOptions(allow_growth=True)
+    tf_config = tf.ConfigProto(allow_soft_placement=True, gpu_options=gpu_options)
 
-            output_sequence = [ind_to_sentence(e, de_itw) for e in output_sequence]
-            inputs = [ind_to_sentence(e, en_itw) for e in inputs]
-            labels = [ind_to_sentence(e, de_itw) for e in labels]
+    with tf.train.SingularMonitoredSession(checkpoint_dir=logdir, config=tf_config) as sess:
+        output_sequence = np.zeros_like(labels, dtype=np.int32)
 
-        return inputs, labels, output_sequence
+        # Perform autoregressive inference
+        for i in range(output_seq_len):
+            autoreg = sess.run(predictions, feed_dict={x: inputs, y: labels})
+            output_sequence[:, i] = autoreg[:, i]
+
+        output_sequence = [ind_to_sentence(e, index_to_word) for e in output_sequence]
+        inputs = [ind_to_sentence(e, index_to_word) for e in inputs]
+        labels = [ind_to_sentence(e, index_to_word) for e in labels]
+
+    return inputs, labels, output_sequence

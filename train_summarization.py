@@ -8,7 +8,7 @@ from modin import pandas as pd
 from sklearn.model_selection import train_test_split
 from tensorflow.contrib.framework import nest
 
-from transformer.model import Transformer
+from transformer.model import Transformer, predict
 from transformer.preprocessing import word_count_to_vocabulary, create_summary_data
 
 
@@ -68,7 +68,7 @@ def main():
                                                              output_maxlen=flags.output_sequence_length)
     train_inputs, val_inputs, train_labels, val_labels = train_test_split(inputs, labels,
                                                                           test_size=flags.validation_split,
-                                                                          random_state=69)
+                                                                          random_state=42)
 
     # Create model
     model = Transformer(flags, vocab_size, vocab_size)
@@ -76,9 +76,19 @@ def main():
     if flags.mode == 'train':
         model.fit(train_inputs, train_labels, val_inputs, val_labels)
     elif flags.mode == 'test':
-        raise NotImplementedError("Test hasn't been implemented for summarization.")
+        loss, acc = model.eval(val_inputs, val_labels)
+        print(f'[loss: {loss}; acc: {acc}]')
     elif flags.mode == 'predict':
-        raise NotImplementedError("Predictions haven't been implemented for summarization.")
+        indices = np.random.randint(0, len(val_inputs), size=flags.batch_size)
+        inputs, true_outputs, predicted_outputs = predict(model, logdir=flags.logdir, inputs=val_inputs[indices],
+                                                          labels=val_labels[indices], vocab_file=flags.vocabulary_file,
+                                                          input_seq_len=flags.input_sequence_length,
+                                                          output_seq_len=flags.output_sequence_length)
+        # noinspection PyTypeChecker
+        for s, o, p in zip(inputs, true_outputs, predicted_outputs):
+            print('input:     ', s)
+            print('true:      ', o)
+            print('predicted: ', p)
 
 
 if __name__ == '__main__':
