@@ -1,7 +1,11 @@
-tensorflow-gpu
+tensorflow
 numpy
 keras
 regex
 tensorboard==1.10.0
 wheel
 nltk
+ray
+ray[debug]
+modin
+scikit-learn

@@ -3,13 +3,14 @@ from functools import reduce
 import numpy as np
 import tensorflow as tf
 
-from transformer import modules, preprocessing
+from transformer import modules
+from transformer.preprocessing import load_vocabulary
 
 
 class Transformer:
     """Variant of the Transformer model from Attention Is All You Need."""
 
-    def __init__(self, flags, en_vocab_size, de_vocab_size):
+    def __init__(self, flags, input_vocab_size, output_vocab_size):
         """
         Parameters
         ----------
@@ -17,8 +18,8 @@ class Transformer:
             Namespace object with model parameters.
         """
         self._flags = flags
-        self._en_vocab_size = en_vocab_size
-        self._de_vocab_size = de_vocab_size
+        self._input_vocab_size = input_vocab_size
+        self._output_vocab_size = output_vocab_size
 
         # Create session config
         gpu_options = tf.GPUOptions(allow_growth=True)
@@ -45,7 +46,7 @@ class Transformer:
             with tf.variable_scope('Encoder'):
                 # Embed inputs
                 embedded = tf.contrib.layers.embed_sequence(inputs,
-                                                            vocab_size=self._en_vocab_size,
+                                                            vocab_size=self._input_vocab_size,
                                                             embed_dim=self._flags.mlp_units,
                                                             scope='Encoder',
                                                             reuse=tf.AUTO_REUSE)
@@ -80,14 +81,14 @@ class Transformer:
                 # Embed decoder inputs
                 decoder_inputs = tf.concat((tf.ones_like(labels[:, :1]) * 2, labels[:, :-1]), -1)
                 embedded = tf.contrib.layers.embed_sequence(decoder_inputs,
-                                                            vocab_size=self._de_vocab_size,
+                                                            vocab_size=self._output_vocab_size,
                                                             embed_dim=self._flags.mlp_units,
                                                             scope='Decoder',
                                                             reuse=tf.AUTO_REUSE)
                 key_masks = tf.expand_dims(tf.sign(tf.reduce_sum(tf.abs(embedded), axis=-1)), -1)
 
                 # Perform positional encoding
-                decoding = modules.positional_encoding(inputs,
+                decoding = modules.positional_encoding(labels,
                                                        batch_size=self._flags.batch_size,
                                                        num_units=self._flags.mlp_units,
                                                        reuse=tf.AUTO_REUSE)
@@ -122,7 +123,7 @@ class Transformer:
                                                       num_units=[4 * self._flags.mlp_units,
                                                                  self._flags.mlp_units])
 
-            logits = tf.layers.Dense(units=self._de_vocab_size)(decoded)
+            logits = tf.layers.Dense(units=self._output_vocab_size)(decoded)
         return logits
 
     def _build(self, inputs, labels, dropout):
@@ -148,7 +149,7 @@ class Transformer:
                                                      labels)) * is_target) / tf.reduce_sum(is_target)
 
         with tf.name_scope('loss'):
-            y_smoothed = modules.label_smoothing(tf.one_hot(labels, depth=self._de_vocab_size))
+            y_smoothed = modules.label_smoothing(tf.one_hot(labels, depth=self._output_vocab_size))
             loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=y_smoothed)
             loss = tf.reduce_sum(loss * tf.cast(is_target, tf.float64)) / tf.cast(
                 tf.reduce_sum(is_target), tf.float64)
@@ -177,7 +178,7 @@ class Transformer:
         train_dataset = train_dataset.repeat(self._flags.num_epochs).batch(self._flags.batch_size)
         train_dataset = train_dataset.prefetch(buffer_size=10 * self._flags.batch_size)
         train_dataset = train_dataset.shuffle(buffer_size=10 * self._flags.batch_size)
-        val_dataset = val_dataset.repeat().batch(32)
+        val_dataset = val_dataset.repeat().batch(16)
 
         # Create iterators and inputs
         train_it = train_dataset.make_one_shot_iterator()
@@ -250,50 +251,57 @@ class Transformer:
 
         return loss / batches, acc / batches
 
-    def predict(self, inputs, labels):
-        """Perform inference on input sentence.
 
-        Parameters
-        ----------
-        inputs:
-            Input sentence.
-        labels:
-            True translation.
+def predict(model, logdir, inputs, labels, vocab_file, input_seq_len, output_seq_len):
+    """Generate predictions for summarization.
 
-        Returns
-        -------
-            output: Generated translation.
-        """
-        # Load vocabularies
-        expected_shape = (self._flags.batch_size, self._flags.sequence_length)
-        assert inputs.shape == expected_shape, f'Invalid input shape, expected {expected_shape}, got {inputs.shape}'
+    Parameters
+    ----------
+    model:
+        Model object.
+    logdir:
+        Checkpoint directory for model weights.
+    inputs:
+        A batch of prediction inputs.
+    labels:
+        A batch of prediction labels.
+    vocab_file:
+        Path to file with summarization vocabulary.
+    input_seq_len:
+        Length of input sequence.
+    output_seq_len:
+        Length of output sequence.
 
-        def ind_to_sentence(seq, index):
-            return reduce(lambda w, a: w + ' ' + a, [index[int(e)] for e in seq]).split('</S>')[0]
+    Returns
+    -------
+        preds: A batch of generated predictions.
+    """
 
-        en_wti, en_itw = preprocessing.load_vocabulary(self._flags.en_vocab_path)
-        de_wti, de_itw = preprocessing.load_vocabulary(self._flags.de_vocab_path)
+    def ind_to_sentence(seq, index):
+        return reduce(lambda w, a: w + ' ' + a, [index[int(e)] for e in seq]).split('</S>')[0]
 
-        # Create placeholders
-        x = tf.placeholder(dtype=tf.int32, shape=[None, self._flags.sequence_length])
-        y = tf.placeholder(dtype=tf.int32, shape=[None, self._flags.sequence_length])
+    word_to_index, index_to_word = load_vocabulary(vocab_file)
 
-        # Create network
-        _, _, logits = self._build(x, y, dropout=False)
-        predictions = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
+    x = tf.placeholder(dtype=tf.int32, shape=[None, input_seq_len])
+    y = tf.placeholder(dtype=tf.int32, shape=[None, output_seq_len])
 
-        # Create session and load model weights.
-        with tf.train.SingularMonitoredSession(checkpoint_dir=self._flags.logdir, config=self._tf_config) as sess:
-            # Initialize output sequence
-            output_sequence = np.zeros_like(inputs, dtype=np.int32)
+    # noinspection PyProtectedMember
+    logits = model._build_model(x, y, dropout=False)
+    predictions = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
 
-            # Perform autoregressive inference
-            for i in range(self._flags.sequence_length):
-                autoreg = sess.run(predictions, feed_dict={x: inputs, y: output_sequence})
-                output_sequence[:, i] = autoreg[:, i]
+    gpu_options = tf.GPUOptions(allow_growth=True)
+    tf_config = tf.ConfigProto(allow_soft_placement=True, gpu_options=gpu_options)
 
-            output_sequence = [ind_to_sentence(e, de_itw) for e in output_sequence]
-            inputs = [ind_to_sentence(e, en_itw) for e in inputs]
-            labels = [ind_to_sentence(e, de_itw) for e in labels]
+    with tf.train.SingularMonitoredSession(checkpoint_dir=logdir, config=tf_config) as sess:
+        output_sequence = np.zeros_like(labels, dtype=np.int32)
 
-        return inputs, labels, output_sequence
+        # Perform autoregressive inference
+        for i in range(output_seq_len):
+            autoreg = sess.run(predictions, feed_dict={x: inputs, y: labels})
+            output_sequence[:, i] = autoreg[:, i]
+
+        output_sequence = [ind_to_sentence(e, index_to_word) for e in output_sequence]
+        inputs = [ind_to_sentence(e, index_to_word) for e in inputs]
+        labels = [ind_to_sentence(e, index_to_word) for e in labels]
+
+    return inputs, labels, output_sequence

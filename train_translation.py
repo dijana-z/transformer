@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 import numpy as np
 
 from transformer import preprocessing
-from transformer.model import Transformer
+from transformer.model import Transformer, predict
 
 
 def main():
@@ -64,11 +64,15 @@ def main():
         print(f'[loss: {loss}; acc: {acc}]')
     elif flags.mode == 'predict':
         indices = np.random.randint(0, len(x_test), size=flags.batch_size)
-        inputs, true_outputs, predicted_outputs = model.predict(x_test[indices], y_test[indices])
+        inputs, true_outputs, predicted_outputs = predict(model, logdir=flags.logdir, inputs=x_test[indices],
+                                                          labels=y_test[indices], vocab_file=flags.vocabulary_file,
+                                                          input_seq_len=flags.input_sequence_length,
+                                                          output_seq_len=flags.output_sequence_length)
+        # noinspection PyTypeChecker
         for s, o, p in zip(inputs, true_outputs, predicted_outputs):
-            print('INPUT: ', s)
-            print('TRUE: ', o)
-            print('PREDICTED: ', p)
+            print('input:     ', s)
+            print('true:      ', o)
+            print('predicted: ', p)
 
 
 if __name__ == '__main__':
