@@ -28,11 +28,14 @@ Get the dataset by running:
 ```
 wget -qO- --show-progress https://wit3.fbk.eu/archive/2016-01//texts/de/en/de-en.tgz | tar xz; mv de-en data
 ```
-Hyperparameters are set via flags passed to the ```train_translation.py``` script in the project root. There are reasonable defaults set so you can just run ```python train_trainslation.py``` to start training, note that training times can get quite long even on a very powerful PC (>24h).
+Hyperparameters are set via flags passed to the ```train_translation.py``` script in the project root. There are reasonable defaults set so you can just run ```python train_trainslation.py``` to start training.
 
 #### Text summarization:
 Get the dataset from [Kaggle](https://www.kaggle.com/snap/amazon-fine-food-reviews/data).
-Hyperparameters are set via flags passed to the ```train_summarization.py``` script in the project root. There are reasonable defaults set so you can just run ```python train_summarization.py``` to start training, note that training times can get quite long even on a very powerful PC (>24h).
+Hyperparameters are set via flags passed to the ```train_summarization.py``` script in the project root. There are reasonable defaults set so you can just run ```python train_summarization.py``` to start training.
+
+##### NOTE:
+Training can take a long time (24h+) even on a very powerful PC.
 
 
 ## :mortar_board: Authors:
